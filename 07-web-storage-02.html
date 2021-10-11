@@ -19,7 +19,7 @@
     <nav class="navbar navbar-light bg-light">
       <div class="container-fluid">
         <a class="navbar-brand">Skilvul</a>
-        <form id="form-username" class="d-none d-flex">
+        <form id="form-username" class="d-flex">
           <input
             class="form-control me-2"
             type="text"
@@ -29,7 +29,7 @@
           />
           <button class="btn btn-outline-primary" type="submit">login</button>
         </form>
-        <div id="div-username" class="d-flex">
+        <div id="div-username" class="d-none d-flex">
           <button
             type="button"
             class="my-auto btn btn-primary btn-sm position-relative h-50"
@@ -54,6 +54,7 @@
     <!-- Optional JavaScript; choose one of the two! -->
     <script type="module">
       import githubUsers from "./07-web-storage-dummy-data.js";
+      import { loggedInHandler, drawUserCard } from "./utils.js";
 
       const elFormUsername = document.querySelector("#form-username");
       const elDivUsername = document.querySelector("#div-username");
@@ -63,41 +64,88 @@
 
       // WEB STORAGE
       let username = sessionStorage.getItem("username");
-      let profile = localStorage.getItem(username ? username : "");
-      if(username){
-          elDivUsername
+      let profile = localStorage.getItem(username); // "[{id:2,login:'foo'},{id:3,login:'wycats'}]"
+
+      const numberOfFollowings = (JSON.parse(profile) || []).length;
+
+      // initialize card
+      drawUserCard(elListUser, githubUsers, username, profile);
+
+      // initialize current followings number/badge
+      drawFollowingsNumber(numberOfFollowings);
+
+      // check if username exist in session storage
+      if (username) {
+        loggedInHandler(username, elDivUsername, elFormUsername, elUsername);
       }
-      githubUsers.forEach((user) => {
-        const elCol = document.createElement("div");
-        elCol.classList.add("col-xs-12", "col-sm-6", "col-md-4", "col-lg-3");
+      // add event listerner click to button if it exist
+      registerEventClickToEachButton();
 
-        const elCard = document.createElement("div");
-        elCard.classList.add("card");
-
-        const elCardImg = document.createElement("div");
-        elCard.classList.add("card-img-top");
-        elCard.setAttribute("src", user.avatar_url);
-
-        const elCardBody = document.createElement("div");
-        elCardBody.classList.add("card-body");
-
-        const elCardTitle = document.createElement("div");
-        elCardTitle.classList.add("card-title");
-        elCardTitle.innerHTML = user.login;
-
-        const elCardButton = document.createElement("button");
-        elCardButton.classList.add("btn", "btn-primary", "w-100");
-        elCardButton.setAttribute("type", "button");
-        elCardButton.innerHTML = "Follow";
-
-        elCardBody.appendChild(elCardTitle);
-        elCardBody.appendChild(elCardButton);
-        elCard.appendChild(elCardBody);
-        elCard.appendChild(elCardImg);
-        elCol.appendChild(elCard);
-
-        elListUser.appendChild(elCol);
+      // event handler when submit button clicked / login button clicked
+      elFormUsername.addEventListener("submit", function(event) {
+        event.preventDefault();
+        // take user input value/username
+        const usernameFromInput = event.target['username'].value;
+        // check if username is valid
+        if (usernameFromInput !== "") {
+          sessionStorage.setItem("username", usernameFromInput);
+          // update 'username' global variable with user input as a value
+          username = usernameFromInput;
+          // show/hide login form
+          loggedInHandler(usernameFromInput, elDivUsername, elFormUsername, elUsername);
+          // create cards element for each users
+          drawUserCard(elListUser, githubUsers, username, profile);
+          registerEventClickToEachButton();
+        }
       });
+
+      function drawFollowingsNumber(number) {
+        if (number > 0) {
+          elBadgeUser.classList.remove("d-none");
+        } else {
+          elBadgeUser.classList.add("d-none");
+        }
+        elBadgeUser.innerHTML = number;
+      }
+
+      function registerEventClickToEachButton() {
+        // event handler when follow/unfollow button clicked
+        let elFollowButtons = document.querySelectorAll(".follow-button");
+        for (let i = 0; i < elFollowButtons.length; i++) {
+          const followButton = elFollowButtons[i];
+          followButton.addEventListener("click", function() {
+            const userId = this.getAttribute("data-id");
+            const followings = JSON.parse(profile) || [];
+            const userTarget = followings.find((u) => u.id === Number(userId));
+            const userDataFromDb = githubUsers.find((u) => u.id === Number(userId));
+            if (!userTarget) {
+              // when user not follow yet, FOLLOW
+              const dataToBePush = [userDataFromDb, ...followings];
+              localStorage.setItem(username, JSON.stringify(dataToBePush));
+              profile = JSON.stringify(dataToBePush);
+              // DOM
+              this.classList.add("btn", "btn-success", "w-100");
+              this.setAttribute("type", "button");
+              this.innerHTML = "Unfollow";
+              // mutate badge ++ followings.length
+              drawFollowingsNumber(dataToBePush.length);
+            } else {
+              // when user already follow, UNFOLLOW
+              const withoutUser = followings.filter((u) => u.id !== Number(userId))
+              const dataToBePush = withoutUser;
+              localStorage.setItem(username, JSON.stringify(dataToBePush));
+              profile = JSON.stringify(dataToBePush);
+              // DOM
+              this.classList.remove("btn-success");
+              this.classList.add("btn", "btn-primary", "w-100");
+              this.setAttribute("type", "button");
+              this.innerHTML = "Follow";
+              // mutate badge -- followings.length
+              drawFollowingsNumber(withoutUser.length);
+            }
+          });
+        }
+      }
 
     </script>
 
